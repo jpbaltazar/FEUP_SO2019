@@ -1,11 +1,11 @@
-/* ppc.c
- *  The Hungry Birds Problem - do the simulation but without ANY kind of synchronization
+/* ppb.c
+ *  The Hungry Birds Problem - pass arguments to threads and receive values from them when they finish!
 
 Program invocation:
-	./ppc <n. babybirds> <n. food portions> <n. refills>
+	./ppb <n. babybirds> <n. food portions> <n. refills>
 
 Invocation example:
-     ./ppc 3 5 10000
+     ./ppb 3 5 10000
 */
 
 #include <stdio.h>
@@ -67,83 +67,83 @@ printf("\nSimulation started\n");
 
 // a preencher com o seu código:
 
-// preparar args e criar thread checker (aqui, pôr o membro mut a NULL!)
-ca = (checkerarg){F, R, &working, &eating};
-if(pthread_create(&tchecker, NULL, checker, &ca) != 0) return -1;
-// preparar args e criar thread parent bird
+// criar thread checker (também SEM passar argumentos!)
+checker = (checkerarg){}
+pthread_create(&tchecker, NULL, checker, NULL);
+
+// criar thread parent bird
 pa = (parentarg){F, R, &working};
-if(pthread_create(&tparent, NULL, parent, &pa) != 0) return -1;
-// preparar args e criar threads baby birds
+pthread_create(&tparent, NULL, parent, &pa);
+
+// criar threads baby birds
 for(int i = 0; i<B; i++){
 	ba[i] = (babyarg){i, &eating};
-	if(pthread_create(tbaby + i, NULL, baby, ba + i) != 0) return -1;
+	pthread_create(tbaby + i, NULL, baby, ba + i);
 }
-
 // esperar por thread parent
-pthread_join(tparent, NULL);
-
-// esperar por threads baby e recolher os seus resultados. Usar:
-long long total = 0;
-long *pbits_eaten;	// get baby bird's eating statistics
+int *parentResult;
+pthread_join(tparent, (void **)&parentResult);
+// esperar por threads baby
+int **babyResult;
+babyResult = malloc(B * sizeof(int *));
 for(int i = 0; i < B; i++)
 {
-	pthread_join(tbaby[i], (void **)&pbits_eaten);
-	printf ("\nNumber of bits of food eaten by baby %d / total of bits: %ld / %ld ", ba[i].id, *pbits_eaten, (R * F));
-	total += *pbits_eaten;
-	free(pbits_eaten);
+	pthread_join(tbaby[i], (void **)(babyResult + i));
 }
-// Usar: printf ("\nNumber of bits of food eaten by baby %d / total of bits: %ld / %ld ", ? , ?, ? );
-
 
 // NÃO esperar pelo thread checker, pois é "detached"!
 
 printf("\nSimulation finished\n");
-printf("%lld\n", total);
 exit (0);
+
 } // main()
 
 
 void *parent(void *arg) {	// parent bird thread
-	parentarg pa;
+parentarg *parg = (parentarg *)arg;
 printf ("\n\tParent starting");
 
-// a preencher com o seu código:
-
-// Usar: printf ("\n\tParent received args f (%d), r (%ld), working (%d)", ? , ? , ? );
-
-	pa = *((parentarg*)arg);
-printf("\n\tParent received args f (%d), r (%ld), working (%d)", pa.f, pa.r , pa.working);
-
-	for(int i = 0; i < pa.r; i++)
-	{
-		while(foodbits > 0);
-		foodbits+=pa.f;
-	}
-	finish = 1;
-
 printf ("\n\tParent finishing");
-
-return NULL;
-} // parent()
+int *res = malloc(sizeof(int));
+*res = 0;
+return res;
+}
 
 
 void *baby(void *arg){	// baby thread
-	babyarg ba;
+babyarg *barg = (babyarg *)arg;
+printf ("\n   Baby bird beginning");
 
-	ba = *((babyarg*)arg);
-	printf ("\n   Baby bird %d beginning", ba.id);
-	printf("\n   Baby received args id (%d), eating (%d)", ba.id, ba.eating);
-	long *res = malloc(sizeof(long));
-	*res = 0;
-
-	while(finish != 1){
-		if(foodbits>0){
-			--foodbits;
-			(*res)++;
-			for(int i = 0; i < 1000000; i++);
-		}
-	}
-
-printf ("\n   Baby bird %d finishing", ba.id);
+printf ("\n   Baby bird finishing");
+int *res = malloc(sizeof(int));
 return res;
-} // baby()
+}
+
+void *parent(void *arg) {	// parent bird thread
+parentarg *parg = (parentarg *)arg;
+printf ("\n\tParent starting");
+for(int i = 0; i < parg->r; i++)
+{
+	while(foodbits > 0);
+	foodbits+=parg->f;
+}
+finish = 1;
+printf ("\n\tParent finishing");
+int *res = malloc(sizeof(int));
+*res = 0;
+return res;
+}
+
+void *baby(void *arg){	// baby thread
+babyarg *barg = (babyarg *)arg;
+printf ("\n   Baby bird beginning");
+while(finish != 1){
+	if(foodbits>0){
+		--foodbits;
+		for(int i = 0; i < 1000000; i++);
+	}
+}
+printf ("\n   Baby bird finishing");
+int *res = malloc(sizeof(int));
+return res;
+}
